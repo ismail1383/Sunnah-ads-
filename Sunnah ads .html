@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Sunnah Ads</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <style>
+        /* --- CSS Styles --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root { --primary-color: #2ecc71; --secondary-color: #27ae60; --background: #f8f9fa; --card-bg: #ffffff; --text-primary: #2c3e50; --text-secondary: #7f8c8d; --border-color: #e0e0e0; --error-color: #e74c3c; --warning-color: #f39c12; }
+        body { font-family: 'Poppins', sans-serif; background: var(--background); color: var(--text-primary); overflow-x: hidden; padding-bottom: 80px; -webkit-tap-highlight-color: transparent; }
+        
+        /* Loader */
+        #app-loader { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10000; }
+        .spinner { width: 50px; height: 50px; border: 4px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loading-txt { color: white; margin-top: 15px; font-weight: 600; }
+
+        /* Header */
+        .profile-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center; color: white; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        #user-photo { width: 80px; height: 80px; border-radius: 50%; border: 3px solid white; object-fit: cover; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        #user-name { margin-top: 10px; font-size: 20px; font-weight: 600; }
+        .balance-box { background: rgba(255,255,255,0.2); padding: 8px 15px; border-radius: 20px; display: inline-block; margin-top: 10px; backdrop-filter: blur(5px); }
+
+        /* Layout */
+        #main-content { padding: 20px; }
+        .page { display: none; animation: fadeIn 0.3s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Components */
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 10px; }
+        .stat-card { background: var(--card-bg); padding: 15px; border-radius: 15px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .stat-card i { font-size: 24px; color: var(--primary-color); margin-bottom: 8px; }
+        .stat-card h3 { font-size: 12px; color: var(--text-secondary); }
+        .stat-card p { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+
+        .card { background: var(--card-bg); padding: 20px; border-radius: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        .card h3 { font-size: 18px; margin-bottom: 15px; color: var(--text-primary); border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
+        .task-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f8f9fa; border-radius: 12px; margin-bottom: 10px; }
+        .task-item img { width: 40px; height: 40px; object-fit: contain; }
+        .task-details { flex: 1; }
+        .task-details h4 { font-size: 14px; margin-bottom: 2px; }
+        .task-details span { font-size: 12px; color: var(--primary-color); font-weight: 600; }
+
+        /* Buttons & Inputs */
+        .action-btn { background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); color: white; border: none; padding: 12px; border-radius: 10px; font-weight: 600; width: 100%; cursor: pointer; transition: 0.2s; }
+        .action-btn:active { transform: scale(0.98); }
+        .action-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-sm { width: auto; padding: 6px 15px; font-size: 12px; border-radius: 20px; }
+        
+        input, select { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 10px; font-family: inherit; }
+        input:focus { outline: none; border-color: var(--primary-color); }
+
+        /* Navigation */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: white; display: flex; justify-content: space-around; padding: 10px 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); z-index: 100; }
+        .nav-btn { background: none; border: none; color: #95a5a6; display: flex; flex-direction: column; align-items: center; font-size: 10px; gap: 4px; }
+        .nav-btn i { font-size: 20px; margin-bottom: 2px; }
+        .nav-btn.active { color: var(--primary-color); }
+
+        /* Popup */
+        .popup-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 2000; backdrop-filter: blur(2px); }
+        .popup-content { background: white; width: 90%; max-width: 400px; padding: 25px; border-radius: 15px; position: relative; text-align: center; }
+        .close-popup { position: absolute; top: 10px; right: 15px; font-size: 24px; cursor: pointer; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <script>
+        const config = {
+            // ⚠️ আপনার তথ্যের সাথে এইগুলো পরিবর্তন করুন
+            botUsername: "Sunnahadbot", // আপনার বটের ইউজারনেম (@ ছাড়া)
+            adZoneId: "10246593",       // আপনার Monetag/Adnetwork Zone ID
+            
+            // Firebase Configuration (এখানে আপনার নিজের কনফিগ বসান)
+            firebaseConfig: {
+                apiKey: "AIzaSyBVIJGeNOmdtnNoAOr1mEoVBG-3u4UxkTQ",
+                authDomain: "sunnah-ads.firebaseapp.com",
+                databaseURL: "https://sunnah-ads-default-rtdb.firebaseio.com",
+                projectId: "sunnah-ads",
+                storageBucket: "sunnah-ads.firebasestorage.app",
+                messagingSenderId: "905348685422",
+                appId: "1:905348685422:web:d29aa485b898bec2a9d07f"
+                measurementId: "G-R6PSN44R3S"
+            },
+
+            // App Settings
+            adValue: 30,             // প্রতি অ্যাড দেখার মূল্য
+            dailyAdLimit: 10,        // প্রতিদিন কয়টি অ্যাড দেখা যাবে
+            referralBonus: 100,      // রেফার বোনাস
+            welcomeBonus: 50,        // নতুন ইউজার বোনাস
+            minWithdraw: 500,        // সর্বনিম্ন উইথড্র
+            minReferralsForWithdraw: 15 // উইথড্র করতে কত রেফার লাগবে
+        };
+    </script>
+
+    <div id="app-loader">
+        <div class="spinner"></div>
+        <p id="loading-txt">Connecting...</p>
+    </div>
+
+    <div id="popup" class="popup-overlay">
+        <div class="popup-content">
+            <span class="close-popup" onclick="hidePopup()">&times;</span>
+            <div id="popup-body"></div>
+        </div>
+    </div>
+
+    <div id="app" style="display: none;">
+        <header class="profile-header">
+            <img id="user-photo" src="https://via.placeholder.com/80" alt="Profile">
+            <h2 id="user-name">Guest User</h2>
+            <div class="balance-box">
+                Balance: <span id="main-balance">0.00</span> TK
+            </div>
+        </header>
+
+        <main id="main-content">
+            
+            <div id="home-page" class="page active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <i class="fas fa-play-circle"></i>
+                        <h3>Today's Ads</h3>
+                        <p id="today-ads">0/10</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-users"></i>
+                        <h3>Referrals</h3>
+                        <p id="total-refs">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-coins"></i>
+                        <h3>Earn Wallet</h3>
+                        <p id="earn-wallet">0.00</p>
+                    </div>
+                    <div class="stat-card">
+                        <i class="fas fa-wallet"></i>
+                        <h3>Total Earned</h3>
+                        <p id="total-earned">0.00</p>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 20px; text-align: center;">
+                    <h3>Daily Task</h3>
+                    <div style="font-size: 40px; color: var(--warning-color); margin: 15px;">
+                        <i class="fas fa-gift"></i>
+                    </div>
+                    <p>Watch ads to earn money!</p>
+                    <button id="watch-ad-btn" class="action-btn" onclick="watchAd()" style="margin-top: 15px;">
+                        Watch Ad (<span id="ad-btn-count">0</span>/<span id="ad-btn-limit">0</span>)
+                    </button>
+                </div>
+            </div>
+
+            <div id="tasks-page" class="page">
+                <div class="card">
+                    <h3>Convert Balance</h3>
+                    <p>Earning Wallet: <b id="convert-wallet-val">0.00</b> TK</p>
+                    <p style="font-size: 12px; color: #777; margin-bottom: 10px;">Minimum 100 TK required to move to Main Balance.</p>
+                    <button class="action-btn" onclick="moveToMainBalance()">Move to Main Balance</button>
+                </div>
+
+                <div class="card">
+                    <h3>Bonus Tasks</h3>
+                    <div id="task-list">
+                        </div>
+                </div>
+            </div>
+
+            <div id="support-page" class="page">
+                <div class="card">
+                    <h3>Contact Us</h3>
+                    <div class="task-item" onclick="window.open('https://t.me/Sunnahad_prement', '_blank')">
+                        <img src="https://cdn-icons-png.flaticon.com/512/2111/2111646.png">
+                        <div class="task-details"><h4>Payment Channel</h4><span>Join Now</span></div>
+                    </div>
+                    <div class="task-item" onclick="window.open('https://t.me/SunnhAdmin', '_blank')">
+                        <img src="https://cdn-icons-png.flaticon.com/512/4233/4233830.png">
+                        <div class="task-details"><h4>Admin Support</h4><span>Message</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="profile-page" class="page">
+                <div class="card">
+                    <h3>Invite Friends</h3>
+                    <p style="font-size: 13px; margin-bottom: 10px;">Refer friends and earn <b style="color:var(--primary-color)">${config.referralBonus} TK</b> per person!</p>
+                    <input type="text" id="ref-link" readonly onclick="this.select()">
+                    <button class="action-btn" onclick="copyRefLink()">Copy Link</button>
+                </div>
+
+                <div class="card">
+                    <h3>Withdraw Money</h3>
+                    <div class="form-group">
+                        <select id="w-method">
+                            <option value="bkash">Bkash</option>
+                            <option value="nagad">Nagad</option>
+                            <option value="rocket">Rocket</option>
+                        </select>
+                        <input type="number" id="w-number" placeholder="Mobile Number (e.g. 017xxxxx)">
+                        <input type="number" id="w-amount" placeholder="Amount (Min 500)">
+                    </div>
+                    <button class="action-btn" onclick="requestWithdraw()">Submit Request</button>
+                </div>
+            </div>
+
+        </main>
+
+        <nav class="bottom-nav">
+            <button class="nav-btn active" onclick="switchPage('home-page', this)">
+                <i class="fas fa-home"></i> Home
+            </button>
+            <button class="nav-btn" onclick="switchPage('tasks-page', this)">
+                <i class="fas fa-tasks"></i> Tasks
+            </button>
+            <button class="nav-btn" onclick="switchPage('support-page', this)">
+                <i class="fas fa-headset"></i> Support
+            </button>
+            <button class="nav-btn" onclick="switchPage('profile-page', this)">
+                <i class="fas fa-user"></i> Profile
+            </button>
+        </nav>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        let db;
+        let user = {};
+        
+        // Default User State
+        let userData = {
+            id: 0,
+            firstName: 'Guest',
+            balance: 0,         // Main Balance (Withdrawable)
+            earnWallet: 0,      // Ad earning wallet
+            referrals: 0,
+            totalEarned: 0,
+            todayAds: 0,
+            lastAdDate: '',
+            completedTasks: {}
+        };
+
+        // --- Initialization ---
+        async function initApp() {
+            tg.ready();
+            tg.expand();
+            
+            // 1. Initialize Firebase
+            if (!firebase.apps.length) {
+                firebase.initializeApp(config.firebaseConfig);
+            }
+            db = firebase.database();
+
+            // 2. Get Telegram User Info
+            const tgUser = tg.initDataUnsafe.user;
+            
+            if (tgUser) {
+                userData.id = tgUser.id;
+                userData.firstName = tgUser.first_name;
+                document.getElementById('user-photo').src = tgUser.photo_url || 'https://via.placeholder.com/80';
+            } else {
+                // For testing in browser without Telegram
+                userData.id = 123456; 
+                console.warn("Running in non-Telegram environment");
+            }
+
+            // 3. Sync Data
+            await syncUserdata();
+            
+            // 4. Load Ad Script
+            loadAdScript();
+            
+            // 5. Render UI
+            updateUI();
+            renderTasks();
+
+            // 6. Hide Loader
+            document.getElementById('app-loader').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+        }
+
+        // --- Firebase Sync Logic (Real Database) ---
+        async function syncUserdata() {
+            const userRef = db.ref('users/' + userData.id);
+            const snapshot = await userRef.once('value');
+            
+            if (snapshot.exists()) {
+                // Existing User: Update local state
+                const data = snapshot.val();
+                userData = { ...userData, ...data };
+                
+                // Check if new day for ad reset
+                const today = new Date().toDateString();
+                if (userData.lastAdDate !== today) {
+                    userData.todayAds = 0;
+                    userData.lastAdDate = today;
+                    saveData();
+                }
+            } else {
+                // New User: Create entry
+                const today = new Date().toDateString();
+                userData.lastAdDate = today;
+                userData.balance = config.welcomeBonus; // Welcome Bonus
+                
+                // Check Referral
+                const startParam = tg.initDataUnsafe.start_param;
+                if (startParam && startParam != userData.id) {
+                    // Give bonus to referrer
+                    const referrerRef = db.ref('users/' + startParam);
+                    referrerRef.child('referrals').transaction(val => (val || 0) + 1);
+                    referrerRef.child('balance').transaction(val => (val || 0) + config.referralBonus);
+                }
+
+                await userRef.set(userData);
+                showPopup(`<h3>Welcome!</h3><p>You received ${config.welcomeBonus} TK bonus.</p>`);
+            }
+        }
+
+        function saveData() {
+            if(userData.id) {
+                db.ref('users/' + userData.id).update(userData);
+                updateUI();
+            }
+        }
+
+        // --- UI Updates ---
+        function updateUI() {
+            document.getElementById('user-name').innerText = userData.firstName;
+            document.getElementById('main-balance').innerText = userData.balance.toFixed(2);
+            document.getElementById('earn-wallet').innerText = userData.earnWallet.toFixed(2);
+            document.getElementById('convert-wallet-val').innerText = userData.earnWallet.toFixed(2);
+            document.getElementById('total-earned').innerText = userData.totalEarned.toFixed(2);
+            document.getElementById('total-refs').innerText = userData.referrals;
+            document.getElementById('today-ads').innerText = `${userData.todayAds}/${config.dailyAdLimit}`;
+            
+            document.getElementById('ad-btn-count').innerText = userData.todayAds;
+            document.getElementById('ad-btn-limit').innerText = config.dailyAdLimit;
+            
+            const refLink = `https://t.me/${config.botUsername}?start=${userData.id}`;
+            document.getElementById('ref-link').value = refLink;
+
+            const watchBtn = document.getElementById('watch-ad-btn');
+            if(userData.todayAds >= config.dailyAdLimit) {
+                watchBtn.disabled = true;
+                watchBtn.innerText = "Task Completed Today";
+                watchBtn.style.background = "#bdc3c7";
+            }
+        }
+
+        // --- Ad System ---
+        function loadAdScript() {
+            const s = document.createElement('script');
+            s.src = '//libtl.com/sdk.js';
+            s.setAttribute('data-zone', config.adZoneId);
+            s.setAttribute('data-sdk', 'show_' + config.adZoneId);
+            document.body.appendChild(s);
+        }
+
+        function watchAd() {
+            if (userData.todayAds >= config.dailyAdLimit) return;
+
+            const btn = document.getElementById('watch-ad-btn');
+            btn.disabled = true;
+            btn.innerText = "Loading Ad...";
+
+            const showAd = window['show_' + config.adZoneId];
+            
+            if (typeof showAd === 'function') {
+                showAd().then(() => {
+                    // Success
+                    userData.earnWallet += config.adValue;
+                    userData.totalEarned += config.adValue;
+                    userData.todayAds++;
+                    saveData();
+                    tg.showAlert(`Success! ${config.adValue} TK added to Earn Wallet.`);
+                }).catch(e => {
+                    tg.showAlert("Ad failed to load. Please try again.");
+                }).finally(() => {
+                    btn.disabled = false;
+                    btn.innerText = `Watch Ad (${userData.todayAds}/${config.dailyAdLimit})`;
+                    updateUI(); // Check if limit reached
+                });
+            } else {
+                tg.showAlert("Ad network error. Please reload.");
+                btn.disabled = false;
+                btn.innerText = "Retry";
+            }
+        }
+
+        // --- Wallet System ---
+        function moveToMainBalance() {
+            if (userData.earnWallet < 100) {
+                tg.showAlert("Minimum 100 TK required to convert.");
+                return;
+            }
+            userData.balance += userData.earnWallet;
+            userData.earnWallet = 0;
+            saveData();
+            showPopup(`<h3>Success!</h3><p>Balance transferred to main wallet.</p>`);
+        }
+
+        function requestWithdraw() {
+            const method = document.getElementById('w-method').value;
+            const number = document.getElementById('w-number').value;
+            const amount = parseFloat(document.getElementById('w-amount').value);
+
+            if (!number || !amount) {
+                tg.showAlert("Please fill all fields.");
+                return;
+            }
+            if (userData.referrals < config.minReferralsForWithdraw) {
+                showPopup(`<h3>Referral Needed</h3><p>You need ${config.minReferralsForWithdraw} referrals to withdraw. You have ${userData.referrals}.</p>`);
+                return;
+            }
+            if (amount < config.minWithdraw) {
+                tg.showAlert(`Minimum withdrawal is ${config.minWithdraw} TK.`);
+                return;
+            }
+            if (amount > userData.balance) {
+                tg.showAlert("Insufficient Main Balance.");
+                return;
+            }
+
+            // Create Request in Firebase
+            const reqId = db.ref('withdrawals').push().key;
+            db.ref('withdrawals/' + reqId).set({
+                userId: userData.id,
+                userName: userData.firstName,
+                amount: amount,
+                method: method,
+                number: number,
+                status: 'pending',
+                date: new Date().toISOString()
+            }).then(() => {
+                userData.balance -= amount;
+                saveData();
+                showPopup(`<h3>Request Sent!</h3><p>Your withdrawal of ${amount} TK is pending approval.</p>`);
+                document.getElementById('w-amount').value = '';
+                document.getElementById('w-number').value = '';
+            });
+        }
+
+        // --- Tasks System ---
+        const staticTasks = [
+            { id: 'yt_sub', title: 'Subscribe YouTube', reward: 50, url: 'https://youtube.com/@pyara-y7s', img: 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png' },
+            { id: 'tg_join', title: 'Join Channel', reward: 50, url: 'https://t.me/Sunnahad_prement', img: 'https://cdn-icons-png.flaticon.com/512/2111/2111646.png' }
+        ];
+
+        function renderTasks() {
+            const list = document.getElementById('task-list');
+            list.innerHTML = '';
+            
+            staticTasks.forEach(task => {
+                const isDone = userData.completedTasks && userData.completedTasks[task.id];
+                const btnHtml = isDone 
+                    ? `<button class="btn-sm" disabled style="background:#ddd; color:#555">Done</button>`
+                    : `<button class="btn-sm action-btn" onclick="doTask('${task.id}', '${task.url}', ${task.reward})">Start</button>`;
+
+                list.innerHTML += `
+                    <div class="task-item">
+                        <img src="${task.img}">
+                        <div class="task-details">
+                            <h4>${task.title}</h4>
+                            <span>+${task.reward} TK</span>
+                        </div>
+                        ${btnHtml}
+                    </div>
+                `;
+            });
+        }
+
+        function doTask(taskId, url, reward) {
+            window.open(url, '_blank');
+            // Simulation of verification
+            setTimeout(() => {
+                if (!userData.completedTasks) userData.completedTasks = {};
+                userData.completedTasks[taskId] = true;
+                userData.balance += reward;
+                saveData();
+                renderTasks();
+                tg.showAlert(`Task Completed! ${reward} TK Added.`);
+            }, 8000); // 8 seconds delay
+        }
+
+        // --- Utilities ---
+        function switchPage(pageId, btn) {
+            document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+            
+            document.getElementById(pageId).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        function hidePopup() { document.getElementById('popup').style.display = 'none'; }
+        
+        function copyRefLink() {
+            const copyText = document.getElementById("ref-link");
+            copyText.select();
+            document.execCommand("copy");
+            tg.showAlert("Referral link copied!");
+        }
+
+        // Start
+        initApp();
+    </script>
+</body>
+</html>
